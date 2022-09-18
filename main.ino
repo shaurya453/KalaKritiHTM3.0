@@ -6,89 +6,94 @@
 #include <Adafruit_SSD1306.h>
 #define OLED_RESET -1                                 //  This for reset. It is not Important to write                // OLED rest in node mcu mean write -1 and in Uno its 4
 #define WIRE Wire
+#include "ESP8266WiFi.h"
+#include <ESP8266HTTPClient.h>
+#include <Arduino.h>
 
 int sensor = A0;
-//int fan = 13 ;                                  //13 is GPIO pin  in NodeMcu & D7 is digital pin in Node Mcu
-//int relay = 13;                               //13 is GPIO pin  in NodeMcu & D7 is digital pin in Node Mcu
 int buzzer = 16;                            //16 is GPIO pin  in NodeMcu & D0 is digital pin in Node Mcu
 int red = 13;                                //2 is GPIO pin  in NodeMcu & D4 is digital pin in Node Mcu
 int green = 12;                             //14 is GPIO pin  in NodeMcu & D5 is digital pin in Node Mcu
 int blue = 14;                            //12 is GPIO pin  in NodeMcu & D6 is digital pin in Node Mcu
-int gasLevel = 0;                                  //int variable for gas level
-String quality = "";
+int gasLevel = 0;                            //int variable for gas level
+String quality;
 
 Adafruit_SSD1306 display = Adafruit_SSD1306(128, 64, &WIRE);
 
+const char *WIFI_SSID = "YeagerEren";
+const char *WIFI_PASSWORD = "pweu6570";
 
+String boolData;
+char strVal[10] = {0};
 
-//char auth[] = " rT_MtHSAJNYZEb2mnKe-VJ8pxw8iMYkR";
-//char ssid[] = "ATL";
-//char pass[] = "ATL@bgnR";
+WiFiClient client;
+HTTPClient httpClient;
 
-void setup()
-{
-
-  Serial.begin(9600);
+void setup(){
+  
+  Serial.begin(115200);
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C); // Address 0x3C for 128x32
   display.clearDisplay();
   display.setTextSize(2);
   display.setTextColor(SSD1306_WHITE);
   display.setCursor(5,20);
   display.print("Kala-Kriti");
-  display.setCursor(0,0);
+  display.setTextSize(1);
+  display.setCursor(5,50);
+  display.print("Connecting...");
   display.display();
-  delay(4000);
+  delay(1000);
 
   pinMode(buzzer, OUTPUT);                       //set beeper for output
   pinMode(sensor, INPUT);                       //set sensor for input
-  //pinMode (relay, OUTPUT);
-  //pinMode (fan, OUTPUT);
   pinMode (red, OUTPUT);
   pinMode (green, OUTPUT);
   pinMode (blue, OUTPUT);
-  //Blynk.begin(auth, ssid, pass);
-  //timer.setInterval(1000L, gassensor); // new data will be updated every 10 sec
+
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  while (WiFi.status() != WL_CONNECTED) {
+      delay(500);
+      Serial.print(".");
+  }
+
+  Serial.println("Connected");
+  Serial.println(WiFi.localIP());
+  
   delay(1000);
+  display.clearDisplay();
+  display.display();
+  
 }
 
-
-void loop()
-{
-
+void loop(){
+  
   gasLevel = analogRead(sensor);
-  Serial.print(" Gas Level:");
-  Serial.println(gasLevel);
   digitalWrite (green, LOW);
   digitalWrite (red, LOW);
   digitalWrite (blue, LOW);
   digitalWrite (buzzer, LOW);
-  //digitalWrite (fan, LOW);
-  //digitalWrite (relay, HIGH);
 
+  if (gasLevel <= 570) {
+    itoa(gasLevel, strVal, 10);
+    myFunction("http://kalakritioof.herokuapp.com/save/", "GOOD", "false", strVal, green);
+    quality = ("Good");
 
-  if (gasLevel < 400) {
-    quality = "GOOD";
-    //digitalWrite(relay, HIGH);
-    digitalWrite (green, HIGH);
-    delay(500);
   }
 
-  else if (gasLevel > 400 and gasLevel < 500) {
-    quality = "Unhealthy";
-    //digitalWrite(relay, LOW);
-    //digitalWrite(fan, HIGH);
-    digitalWrite (blue, HIGH);
-    tone(buzzer, 800, 50);
-    delay(200);
+  else if (gasLevel > 570 and gasLevel < 650) {
+    itoa(gasLevel, strVal, 10);
+    myFunction("http://kalakritioof.herokuapp.com/save/", "UNHEALTHY", "true", strVal, blue);
+    quality = ("Unhealthy");
+
+
+
   }
 
-  else if (gasLevel > 500) {
-    quality = "Hazardous ";
-    //digitalWrite(relay, LOW);
-    //digitalWrite(fan, HIGH);
-    digitalWrite (red, HIGH);
-    digitalWrite( buzzer, HIGH);
-    delay(200);
+  else if (gasLevel > 650) {
+    itoa(gasLevel, strVal, 10);
+    myFunction("http://kalakritioof.herokuapp.com/save/", "HAZARDOUS", "true", strVal, red);
+    quality = ("Hazardous");
+    tone(16, 1000, 500);
   }
 
   display.clearDisplay();
@@ -104,4 +109,17 @@ void loop()
   display.println(quality);
   display.display();
   delay(500);
+  
+} 
+
+void myFunction(String url, String quality, String boolData, String strVal, int led) {
+  
+  String URL = url + "/" + boolData + "/" + strVal + "/" + quality;
+  digitalWrite(led, HIGH);
+
+  httpClient.begin(client, URL);
+  httpClient.POST(URL);
+  Serial.println(URL);
+  delay(100);
+
 }
